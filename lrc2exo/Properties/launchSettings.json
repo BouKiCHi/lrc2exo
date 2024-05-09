@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "lrc2exo": {
+      "commandName": "Project",
+      "commandLineArgs": "..\\..\\..\\testsong.lrc"
+    }
+  }
+}
