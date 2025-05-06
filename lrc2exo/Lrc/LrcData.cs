@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Text.RegularExpressions;
 
-class LrcData {
+/// <summary>
+/// LRCデータ作成
+/// </summary>
+class LrcData : ISubData {
 
-  public List<LrcText> Data = new List<LrcText>();
+  public List<ISubText> Data { get; } = new List<ISubText>();
   public LrcData(string file) {
     var lines = File.ReadAllLines(file);
     LrcText? lastObject = null;
@@ -30,8 +33,12 @@ class LrcData {
     }
   }
 
-  internal int GetLength(int fps) {
-    var endms = Data.Max(x => x.EndMs);
-    return (int)(endms / 1000f * fps);
+  /// <summary>
+  /// 全体の終了時間を取得
+  /// </summary>
+  public int GetTotalEndMs() {
+    if(Data.Count == 0)
+      return 0;
+    return Data.Max(x => x.EndMs);
   }
 }

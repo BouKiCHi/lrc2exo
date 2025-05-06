@@ -1,6 +1,8 @@
-﻿
-using System.Text;
+﻿using System.Text;
 
+/// <summary>
+/// EXOファイル出力
+/// </summary>
 class ExoWriter {
   private readonly Setting setting;
 
@@ -8,28 +10,68 @@ class ExoWriter {
     this.setting = setting;
   }
 
-  public void OutputExo(string filename, LrcData lrc) {
+
+  /// <summary>
+  /// EXOファイル出力
+  /// </summary>
+  public void OutputExo(string filename, ISubData lrc) {
     var sjisEnc = Encoding.GetEncoding("shift_jis");
 
     var sw = new StreamWriter(filename, false, sjisEnc);
     var y = setting.Top;
     var fps = setting.FramePerSec;
-    var length = lrc.GetLength(fps);
+    var totalEndMs = lrc.GetTotalEndMs();
+    var length = CalcLength(totalEndMs, fps);
 
     WriteHeader(sw, length);
 
     var itemNo = 0;
     foreach(var e in lrc.Data) {
-      var start = e.GetStartFrame(fps);
-      var end = e.GetEndFrame(fps);
-      var content = e.Content;
-      Console.WriteLine($"start:{start} end:{end} text:{content}");
-      WriteText(sw, itemNo++, y, start, end, ToExoText(content));
+      var startFrame= CalcStartFrame(e.StartMs, fps);
+      var endFrame = CalcEndFrame(e.EndMs, fps);
+      var content = e.TextContent;
+      Console.WriteLine($"startFrame:{startFrame} endFrame:{endFrame} text:{content}");
+
+      // 1行に収まらない、かつ改行がない場合は、改行を入れる
+      if(setting.LineLength < content.Length && !content.Contains("\n")) {
+
+        var chunks = content.Chunk(setting.LineLength)
+              .Select(chunk => new string(chunk));
+
+        content = string.Join("\n", chunks);
+      }
+      WriteTextObject(sw, 1, itemNo++, y, startFrame, endFrame, ToExoText(content));
     }
 
     sw.Close();
   }
 
+  /// <summary>
+  /// 長さ計算
+  /// </summary>
+  private int CalcLength(int endMs, int fps) {
+    return (int)(endMs / 1000f * fps);
+  }
+
+  /// <summary>
+  /// 開始フレームを計算
+  /// </summary>
+  private int CalcStartFrame(int startMs, int fps) {
+    return (int)(startMs / 1000f * fps);
+  }
+
+  /// <summary>
+  /// 終了フレームを計算
+  /// </summary>
+  private int CalcEndFrame(int endMs, int fps) {
+    var ed = (int)(endMs / 1000f * fps);
+    // 後の位置を考慮して、1フレーム前にする
+    return 1 < ed ? ed - 1 : ed;
+  }
+
+  /// <summary>
+  /// ヘッダ部分の作成
+  /// </summary>
   private void WriteHeader(StreamWriter sw, int length) {
     var width = setting.Width;
     var height = setting.Height;
@@ -48,13 +90,16 @@ audio_ch=2
   }
 
 
-  private void WriteText(StreamWriter sw, int itemNo, int y, int start, int end,string content) {
+  /// <summary>
+  /// テキストオブジェクトの作成
+  /// </summary>
+  private void WriteTextObject(StreamWriter sw, int layer, int itemNo, int y, int start, int end,string content) {
     var font = setting.FontName;
     var size = setting.FontSize;
     var output = $@"[{itemNo}]
 start={start + 1}
 end={end + 1}
-layer=1
+layer={layer}
 overlay=1
 camera=0
 [{itemNo}.0]

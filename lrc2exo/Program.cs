@@ -2,48 +2,57 @@
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Text.Unicode;
 
 internal class Program {
   private static void Main(string[] args) {
-    Console.WriteLine("lrc2exo ver 1.0");
+    Console.WriteLine("lrc2exo ver 1.1");
 
     var jsonFilename = "settings.json";
 
-    Setting setting;
-    if (!File.Exists(jsonFilename)) {
-      setting = new Setting();
-      var settingJson = JsonSerializer.Serialize(setting, new JsonSerializerOptions { 
-        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-        WriteIndented = true,
-      });
-      File.WriteAllText(jsonFilename, settingJson.ToString());
-    } else {
-      var settingJson = File.ReadAllText(jsonFilename);
-      setting = JsonSerializer.Deserialize<Setting>(settingJson) ?? new Setting();
-    }
-
+    var setting = Setting.Load(jsonFilename);
 
     if(args.Length == 0) {
-      Console.WriteLine("usage: lrc2exo <file.lrc>");
+      Console.WriteLine("usage: lrc2exo <file.lrc|file.srt>");
       return;
     }
 
-    var lrcFilename = args[0];
-    if (!File.Exists(lrcFilename)) {
-      Console.WriteLine($"File not found:{lrcFilename}");
+    var inputFilename = args[0];
+    if(!File.Exists(inputFilename)) {
+      Console.WriteLine($"File not found:{inputFilename}");
       return;
     }
 
-    var lrc = new LrcData(args[0]);
+    // 対応ファイルを読み込む
+    var data = LoadSupportedFile(inputFilename);
+    if (data == null) {
+      Console.WriteLine("File format is not supported.");
+      return;
+    }
 
-    const string filename = "output.exo";
 
+    const string outputFilename = "output.exo";
+
+    // エンコーディングの登録
     Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
     var exo = new ExoWriter(setting);
-    exo.OutputExo(filename, lrc);
+    exo.OutputExo(outputFilename, data);
 
     Console.WriteLine("done.\n");
+  }
+
+  private static ISubData? LoadSupportedFile(string inputFilename) {
+    if(inputFilename.EndsWith(".srt", StringComparison.OrdinalIgnoreCase)) {
+      var srt = new SrtData(inputFilename);
+      return srt;
+    }
+
+    if(inputFilename.EndsWith(".lrc", StringComparison.OrdinalIgnoreCase)) {
+      var lrc = new LrcData(inputFilename);
+      return lrc;
+    }
+
+    return null;
   }
 }
